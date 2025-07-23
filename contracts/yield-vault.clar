@@ -314,3 +314,97 @@
     (ok true)
   )
 )
+
+;; READ-ONLY QUERY FUNCTIONS
+
+;; Get Protocol Owner Address
+(define-read-only (get-contract-owner)
+  (ok CONTRACT-OWNER)
+)
+
+;; Get Total Staked STX Pool
+(define-read-only (get-stx-pool)
+  (ok (var-get stx-pool))
+)
+
+;; Get Total Governance Proposals
+(define-read-only (get-proposal-count)
+  (ok (var-get proposal-count))
+)
+
+;; INTERNAL CALCULATION ENGINES
+
+;; Intelligent Tier Assessment Algorithm
+(define-private (get-tier-info (stake-amount uint))
+  (if (>= stake-amount u10000000)
+    {
+      tier-level: u3,
+      reward-multiplier: u200,
+    } ;; Gold Tier
+    (if (>= stake-amount u5000000)
+      {
+        tier-level: u2,
+        reward-multiplier: u150,
+      } ;; Silver Tier
+      {
+        tier-level: u1,
+        reward-multiplier: u100,
+      } ;; Bronze Tier
+    )
+  )
+)
+
+;; Time-Lock Bonus Calculator
+(define-private (calculate-lock-multiplier (lock-period uint))
+  (if (>= lock-period u8640) ;; 60-day commitment
+    u150 ;; 1.5x loyalty bonus
+    (if (>= lock-period u4320) ;; 30-day commitment
+      u125 ;; 1.25x commitment bonus
+      u100 ;; Standard rate (flexible)
+    )
+  )
+)
+
+;; Advanced Yield Calculation Engine
+(define-private (calculate-rewards
+    (user principal)
+    (blocks uint)
+  )
+  (let (
+      (staking-position (unwrap! (map-get? StakingPositions user) u0))
+      (user-position (unwrap! (map-get? UserPositions user) u0))
+      (stake-amount (get amount staking-position))
+      (base-rate (var-get base-reward-rate))
+      (multiplier (get rewards-multiplier user-position))
+    )
+    ;; Compound Yield Formula: (Stake * Rate * Multiplier * Time) / Precision
+    (/ (* (* (* stake-amount base-rate) multiplier) blocks) u14400000)
+  )
+)
+
+;; INPUT VALIDATION HELPERS
+
+;; Proposal Description Validator
+(define-private (is-valid-description (desc (string-utf8 256)))
+  (and
+    (>= (len desc) u10) ;; Minimum clarity requirement
+    (<= (len desc) u256) ;; Maximum length constraint
+  )
+)
+
+;; Lock Period Validator
+(define-private (is-valid-lock-period (lock-period uint))
+  (or
+    (is-eq lock-period u0) ;; Flexible staking
+    (is-eq lock-period u4320) ;; 30-day lock
+    (is-eq lock-period u8640) ;; 60-day lock
+  )
+)
+
+;; Voting Period Validator
+(define-private (is-valid-voting-period (period uint))
+  (and
+    (>= period u100) ;; Minimum deliberation time
+    (<= period u2880) ;; Maximum voting window (~20 hours)
+  )
+)
